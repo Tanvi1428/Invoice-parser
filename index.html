@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Processing - Frontend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7fc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        input[type="file"],
+        select,
+        button {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            background-color: #f9f9f9;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+        }
+
+        button {
+            background-color: #007BFF;
+            color: white;
+            font-size: 1rem;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .feedback {
+            margin-top: 20px;
+        }
+
+        .footer {
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #777;
+        }
+
+        #loading {
+            display: none;
+            margin: 20px 0;
+            color: #666;
+        }
+
+        .error-message {
+            color: #dc3545;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .success-message {
+            color: #28a745;
+            margin: 10px 0;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Invoice Image Upload</h1>
+        <form id="uploadForm">
+            <div>
+                <label for="image">Choose an Invoice Image:</label>
+                <input type="file" id="image" name="image" accept="image/*" required>
+            </div>
+            <div>
+                <label for="model">Select Model:</label>
+                <select id="model" name="model" required>
+                    <option value="" disabled selected>Select a Model</option>
+                    <option value="model1">Model 1</option>
+                    <option value="model2">Model 2</option>
+                    <option value="model3">Model 3</option>
+                    <option value="model4">Model 4</option>
+                    <option value="model5">Model 5</option>
+                    <option value="model6">Model 6</option>
+                </select>
+            </div>
+            <button type="submit">Process Invoice</button>
+        </form>
+
+        <div id="loading">Processing your invoice...</div>
+        <div id="error-message" class="error-message"></div>
+        <div id="success-message" class="success-message"></div>
+
+        <!-- Result will be shown here -->
+        <div id="result" style="display: none;">
+            <h2>Processing Results</h2>
+            <pre id="jsonOutput"></pre>
+            <div class="feedback">
+                <h3>Was this result helpful?</h3>
+                <button onclick="sendFeedback('happy')">👍 Yes</button>
+                <button onclick="sendFeedback('sad')">👎 No</button>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Powered by Your Invoice Processing System</p>
+        </div>
+    </div>
+
+    <script>
+        let currentProcessId = '';
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const imageFile = document.getElementById('image').files[0];
+            const modelSelection = document.getElementById('model').value;
+            
+            if (!imageFile || !modelSelection) {
+                showError('Please select both an image and a model');
+                return;
+            }
+
+            formData.append('image', imageFile);
+            formData.append('model', modelSelection);
+
+            // Show loading state
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+            hideMessages();
+
+            try {
+                const response = await fetch('/submit', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    // Store the process ID for feedback
+                    currentProcessId = data.process_id;
+                    
+                    // Display the results
+                    document.getElementById('jsonOutput').textContent = 
+                        JSON.stringify(data.result, null, 2);
+                    document.getElementById('result').style.display = 'block';
+                    showSuccess('Processing complete!');
+                } else {
+                    showError(data.message || 'Error processing the invoice');
+                }
+            } catch (error) {
+                showError('Error connecting to the server');
+                console.error('Error:', error);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        });
+
+        async function sendFeedback(status) {
+            if (!currentProcessId) {
+                showError('No active process to provide feedback for');
+                return;
+            }
+
+            try {
+                const response = await fetch('/feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        process_id: currentProcessId,
+                        status: status
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    showSuccess('Thank you for your feedback!');
+                } else {
+                    showError(data.message || 'Error submitting feedback');
+                }
+            } catch (error) {
+                showError('Error connecting to the server');
+                console.error('Error:', error);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success-message');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function hideMessages() {
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('success-message').style.display = 'none';
+        }
+    </script>
+</body>
+
+</html>
