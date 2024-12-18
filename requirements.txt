@@ -1,0 +1,7 @@
+flask
+opencv-python
+tesseract
+paddlepaddle
+paddleocr
+requests
+textract
